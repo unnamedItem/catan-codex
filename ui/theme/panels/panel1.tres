@@ -1,0 +1,11 @@
+[gd_resource type="StyleBoxTexture" load_steps=2 format=3 uid="uid://d3nv5s14nc081"]
+
+[ext_resource type="Texture2D" uid="uid://dg2fb6ebu3kv1" path="res://assets/UI/assets/panel_brown_dark_corners_a.png" id="1_6q64w"]
+
+[resource]
+texture = ExtResource("1_6q64w")
+texture_margin_left = 32.0
+texture_margin_top = 24.0
+texture_margin_right = 32.0
+texture_margin_bottom = 24.0
+region_rect = Rect2(0, 0, 128, 128)
