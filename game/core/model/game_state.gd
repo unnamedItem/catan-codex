@@ -37,7 +37,14 @@ func setup_new_game(config: GameConfig) -> void:
 	flags.clear()
 	bank = BankState.new()
 	map = MapState.new()
-	map.generate_rings(int(config_data.get("map_rings", 2)), seed)
+	var map_definition: Dictionary = Dictionary(config_data.get("map_definition", {}))
+	if map_definition.is_empty():
+		map.generate_rings(int(config_data.get("map_rings", 2)), seed)
+	else:
+		var ok: bool = map.generate_from_definition(map_definition, seed)
+		if not ok:
+			push_warning("Map definition invalid (%s). Falling back to ring generator." % map.last_generation_error)
+			map.generate_rings(int(config_data.get("map_rings", 2)), seed)
 
 	var starting_resources: Dictionary = Dictionary(config_data.get("starting_resources", {})).duplicate(true)
 	var player_count: int = int(config_data.get("player_count", 4))

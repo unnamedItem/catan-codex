@@ -6,6 +6,7 @@ var vertices: Dictionary = {}
 var edges: Dictionary = {}
 var ports: Dictionary = {}
 var robber_hex: String = ""
+var last_generation_error: String = ""
 
 func _init(data: Dictionary = {}) -> void:
 	if data.is_empty():
@@ -23,6 +24,7 @@ func clear() -> void:
 	edges.clear()
 	ports.clear()
 	robber_hex = ""
+	last_generation_error = ""
 
 func generate_rings(rings: int, seed: int = 0) -> void:
 	assert(rings >= 0, "rings must be >= 0")
@@ -38,24 +40,85 @@ func generate_rings(rings: int, seed: int = 0) -> void:
 		var token_number: int = _roll_token_number(terrain, rng)
 		var tile := TileState.new(hex_key, terrain, token_number, false)
 		tiles[hex_key] = tile
-
-		for corner in range(6):
-			var vertex_a: String = HexIds.vertex_id(hex, corner)
-			var vertex_b: String = HexIds.vertex_id(hex, (corner + 1) % 6)
-
-			if not vertices.has(vertex_a):
-				vertices[vertex_a] = VertexState.new()
-			if not vertices.has(vertex_b):
-				vertices[vertex_b] = VertexState.new()
-
-			var edge_key: String = HexIds.edge_id(vertex_a, vertex_b)
-			if not edges.has(edge_key):
-				edges[edge_key] = EdgeState.new(vertex_a, vertex_b, -1)
+		_add_topology_for_hex(hex)
 
 	if tiles.has(center.to_key()):
 		robber_hex = center.to_key()
 		var center_tile: TileState = tiles[robber_hex] as TileState
 		center_tile.has_robber = true
+
+func generate_from_definition(definition: Dictionary, seed: int = 0) -> bool:
+	clear()
+
+	var raw_tiles: Array = Array(definition.get("tiles", []))
+	if raw_tiles.is_empty():
+		last_generation_error = "Map definition missing non-empty 'tiles' array."
+		return false
+
+	var terrains_pool: Array[int] = []
+	for raw_entry in raw_tiles:
+		var entry: Dictionary = Dictionary(raw_entry)
+		var count: int = int(entry.get("count", 0))
+		if count <= 0:
+			continue
+
+		var terrain: int = _terrain_from_definition_entry(entry)
+		if terrain < TileState.TERRAIN_FOREST or terrain > TileState.TERRAIN_DESERT:
+			last_generation_error = "Invalid terrain entry in map definition: %s" % [str(entry)]
+			return false
+
+		for _i in range(count):
+			terrains_pool.append(terrain)
+
+	if terrains_pool.is_empty():
+		last_generation_error = "Map definition produced zero tiles."
+		return false
+
+	var rings: int = _infer_rings_from_tile_count(terrains_pool.size())
+	if rings < 0:
+		last_generation_error = "Tile count %d cannot be represented as a hex spiral." % [terrains_pool.size()]
+		return false
+
+	var center := Hex.new(0, 0, 0)
+	var all_hexes: Array[Hex] = HexMath.spiral(center, rings)
+	if all_hexes.size() != terrains_pool.size():
+		last_generation_error = "Hex count mismatch: expected %d, got %d." % [all_hexes.size(), terrains_pool.size()]
+		return false
+
+	var numbers_pool: Array = Array(definition.get("numbers", [])).duplicate()
+	var expected_numbers: int = terrains_pool.size() - terrains_pool.count(TileState.TERRAIN_DESERT)
+	if numbers_pool.size() != expected_numbers:
+		last_generation_error = "Expected %d numbers for non-desert tiles, got %d." % [expected_numbers, numbers_pool.size()]
+		return false
+
+	var rng := RNG.new(seed)
+	_shuffle_array(terrains_pool, rng)
+
+	var number_index: int = 0
+	for i in range(all_hexes.size()):
+		var hex: Hex = all_hexes[i]
+		var terrain: int = terrains_pool[i]
+		var token_number: int = 0
+		if terrain != TileState.TERRAIN_DESERT:
+			token_number = int(numbers_pool[number_index])
+			number_index += 1
+
+		var hex_key: String = hex.to_key()
+		var tile := TileState.new(hex_key, terrain, token_number, false)
+		tiles[hex_key] = tile
+		_add_topology_for_hex(hex)
+
+		if terrain == TileState.TERRAIN_DESERT and robber_hex.is_empty():
+			robber_hex = hex_key
+			tile.has_robber = true
+
+	if robber_hex.is_empty() and tiles.has(center.to_key()):
+		robber_hex = center.to_key()
+		var center_tile: TileState = tiles[robber_hex] as TileState
+		center_tile.has_robber = true
+
+	ports = _build_ports_from_definition(Array(definition.get("docks", [])), rng)
+	return true
 
 func get_vertex(vertex_id: String) -> VertexState:
 	if not vertices.has(vertex_id):
@@ -121,3 +184,81 @@ func _roll_token_number(terrain: int, rng: RNG) -> int:
 	while candidate == 7:
 		candidate = rng.randi_range(2, 12)
 	return candidate
+
+func _add_topology_for_hex(hex: Hex) -> void:
+	for corner in range(6):
+		var vertex_a: String = HexIds.vertex_id(hex, corner)
+		var vertex_b: String = HexIds.vertex_id(hex, (corner + 1) % 6)
+
+		if not vertices.has(vertex_a):
+			vertices[vertex_a] = VertexState.new()
+		if not vertices.has(vertex_b):
+			vertices[vertex_b] = VertexState.new()
+
+		var edge_key: String = HexIds.edge_id(vertex_a, vertex_b)
+		if not edges.has(edge_key):
+			edges[edge_key] = EdgeState.new(vertex_a, vertex_b, -1)
+
+func _terrain_from_definition_entry(entry: Dictionary) -> int:
+	if entry.has("terrain"):
+		return int(entry.get("terrain", TileState.TERRAIN_DESERT))
+
+	var terrain_id: String = String(entry.get("id", "")).to_upper()
+	match terrain_id:
+		"WOOD", "FOREST":
+			return TileState.TERRAIN_FOREST
+		"BRICK", "HILLS":
+			return TileState.TERRAIN_HILLS
+		"SHEEP", "PASTURE":
+			return TileState.TERRAIN_PASTURE
+		"WHEAT", "FIELDS":
+			return TileState.TERRAIN_FIELDS
+		"ORE", "MOUNTAINS":
+			return TileState.TERRAIN_MOUNTAINS
+		"DESERT":
+			return TileState.TERRAIN_DESERT
+		_:
+			return -1
+
+func _infer_rings_from_tile_count(tile_count: int) -> int:
+	var rings: int = 0
+	while true:
+		var expected_count: int = 1 + (3 * rings * (rings + 1))
+		if expected_count == tile_count:
+			return rings
+		if expected_count > tile_count:
+			return -1
+		rings += 1
+
+	return -1
+
+func _shuffle_array(items: Array, rng: RNG) -> void:
+	for i in range(items.size() - 1, 0, -1):
+		var j: int = rng.randi_range(0, i)
+		var tmp = items[i]
+		items[i] = items[j]
+		items[j] = tmp
+
+func _build_ports_from_definition(raw_docks: Array, rng: RNG) -> Dictionary:
+	var result: Dictionary = {}
+	var expanded: Array[String] = []
+
+	for raw_dock in raw_docks:
+		var dock: Dictionary = Dictionary(raw_dock)
+		var count: int = int(dock.get("count", 0))
+		if count <= 0:
+			continue
+		var port_id: String = String(dock.get("id", "")).to_upper()
+		if port_id.is_empty():
+			continue
+		for _i in range(count):
+			expanded.append(port_id)
+
+	_shuffle_array(expanded, rng)
+
+	for i in range(expanded.size()):
+		result["P:%d" % i] = {
+			"id": expanded[i],
+		}
+
+	return result
