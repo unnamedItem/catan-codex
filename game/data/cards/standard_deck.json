@@ -1,0 +1,16 @@
+{
+    "development_cards": [
+        { "id": "knight", "count": 14, "type": "KNIGHT" },
+        { "id": "road_building", "count": 2, "type": "ROAD_BUILDING" },
+        { "id": "year_of_plenty", "count": 2, "type": "YEAR_OF_PLENTY" },
+        { "id": "monopoly", "count": 2, "type": "MONOPOLY" },
+        { "id": "victory_point", "count": 5, "type": "VICTORY_POINT" }
+    ],
+    "resource_cards": [
+        { "id": "WOOD", "count": 19 },
+        { "id": "BRICK", "count": 19 },
+        { "id": "SHEEP", "count": 19 },
+        { "id": "WHEAT", "count": 19 },
+        { "id": "ORE", "count": 19 }
+    ]
+}

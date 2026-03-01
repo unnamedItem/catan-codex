@@ -1,0 +1,21 @@
+{
+    "map_id": "standard_map",
+    "mode": "procedural",
+    "tiles": [
+        { "id": "WOOD", "count": 4 },
+        { "id": "SHEEP", "count": 4 },
+        { "id": "WHEAT", "count": 4 },
+        { "id": "BRICK", "count": 3 },
+        { "id": "ORE", "count": 3 },
+        { "id": "DESERT", "count": 1 }
+    ],
+    "numbers": [11, 3, 6, 5, 4, 9, 10, 8, 4, 11, 12, 9, 10, 8, 3, 6, 2, 5],
+    "docks": [
+        { "id": "WOOD", "count": 1 },
+        { "id": "SHEEP", "count": 1 },
+        { "id": "WHEAT", "count": 2 },
+        { "id": "BRICK", "count": 1 },
+        { "id": "ORE", "count": 1 },
+        { "id": "COMMON", "count": 3 }
+    ]
+}

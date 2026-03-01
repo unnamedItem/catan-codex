@@ -1,0 +1,91 @@
+[gd_scene load_steps=10 format=3 uid="uid://c57hh4h3qdgmb"]
+
+[ext_resource type="StyleBox" uid="uid://d3nv5s14nc081" path="res://ui/theme/panels/panel1.tres" id="1_1q7ng"]
+[ext_resource type="StyleBox" uid="uid://b4jifdeq1cjl3" path="res://ui/theme/panels/panel2.tres" id="2_cosos"]
+[ext_resource type="PackedScene" uid="uid://cumdobt7n7t0c" path="res://ui/widgets/counter.tscn" id="3_kuv5k"]
+[ext_resource type="Texture2D" uid="uid://ddyc8kq8dat0" path="res://assets/art/icons/bag.svg" id="4_yap1y"]
+[ext_resource type="Texture2D" uid="uid://bagsrr87wce6v" path="res://assets/art/icons/lightbulb.svg" id="5_yap1y"]
+[ext_resource type="Texture2D" uid="uid://bk6hg783f48mc" path="res://assets/art/icons/road.svg" id="6_bemir"]
+[ext_resource type="Texture2D" uid="uid://lwciw58qou1e" path="res://assets/art/icons/pawn.svg" id="6_yap1y"]
+
+[sub_resource type="LabelSettings" id="LabelSettings_cosos"]
+font_size = 14
+font_color = Color(1, 0.94509804, 0.8235294, 1)
+
+[sub_resource type="LabelSettings" id="LabelSettings_kuv5k"]
+font_color = Color(1, 0.94509804, 0.8235294, 1)
+
+[node name="PlayerPanel" type="Control"]
+layout_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="PanelContainer" type="PanelContainer" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -178.0
+offset_top = -60.0
+offset_right = 178.0
+offset_bottom = 60.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = ExtResource("1_1q7ng")
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer"]
+layout_mode = 2
+theme_override_constants/separation = 24
+
+[node name="PanelContainer" type="PanelContainer" parent="PanelContainer/HBoxContainer"]
+custom_minimum_size = Vector2(120, 0)
+layout_mode = 2
+theme_override_styles/panel = ExtResource("2_cosos")
+
+[node name="VBoxContainer" type="VBoxContainer" parent="PanelContainer/HBoxContainer/PanelContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
+
+[node name="PlayerName" type="Label" parent="PanelContainer/HBoxContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "Player Name"
+label_settings = SubResource("LabelSettings_cosos")
+horizontal_alignment = 1
+
+[node name="Points" type="Label" parent="PanelContainer/HBoxContainer/PanelContainer/VBoxContainer"]
+layout_mode = 2
+text = "0 PV"
+label_settings = SubResource("LabelSettings_kuv5k")
+horizontal_alignment = 1
+
+[node name="HBoxContainer" type="HBoxContainer" parent="PanelContainer/HBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 6
+size_flags_vertical = 4
+theme_override_constants/separation = 40
+
+[node name="Resources" parent="PanelContainer/HBoxContainer/HBoxContainer" instance=ExtResource("3_kuv5k")]
+layout_mode = 2
+icon = ExtResource("4_yap1y")
+
+[node name="Developments" parent="PanelContainer/HBoxContainer/HBoxContainer" instance=ExtResource("3_kuv5k")]
+layout_mode = 2
+icon = ExtResource("5_yap1y")
+
+[node name="Army" parent="PanelContainer/HBoxContainer/HBoxContainer" instance=ExtResource("3_kuv5k")]
+layout_mode = 2
+icon = ExtResource("6_yap1y")
+
+[node name="Roads" parent="PanelContainer/HBoxContainer/HBoxContainer" instance=ExtResource("3_kuv5k")]
+layout_mode = 2
+icon = ExtResource("6_bemir")
