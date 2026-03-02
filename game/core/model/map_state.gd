@@ -26,13 +26,13 @@ func clear() -> void:
 	robber_hex = ""
 	last_generation_error = ""
 
-func generate_rings(rings: int, seed: int = 0) -> void:
+func generate_rings(rings: int, _seed: int = 0) -> void:
 	assert(rings >= 0, "rings must be >= 0")
 	clear()
 
 	var center := Hex.new(0, 0, 0)
 	var all_hexes: Array[Hex] = HexMath.spiral(center, rings)
-	var rng := RNG.new(seed)
+	var rng := RNG.new(_seed)
 
 	for hex in all_hexes:
 		var hex_key: String = hex.to_key()
@@ -47,8 +47,12 @@ func generate_rings(rings: int, seed: int = 0) -> void:
 		var center_tile: TileState = tiles[robber_hex] as TileState
 		center_tile.has_robber = true
 
-func generate_from_definition(definition: Dictionary, seed: int = 0) -> bool:
+func generate_from_definition(definition: Dictionary, _seed: int = 0) -> bool:
 	clear()
+
+	var explicit_layout: Array = Array(definition.get("tiles_layout", []))
+	if not explicit_layout.is_empty():
+		return _generate_from_explicit_layout(definition, explicit_layout, _seed)
 
 	var raw_tiles: Array = Array(definition.get("tiles", []))
 	if raw_tiles.is_empty():
@@ -74,15 +78,11 @@ func generate_from_definition(definition: Dictionary, seed: int = 0) -> bool:
 		last_generation_error = "Map definition produced zero tiles."
 		return false
 
-	var rings: int = _infer_rings_from_tile_count(terrains_pool.size())
-	if rings < 0:
-		last_generation_error = "Tile count %d cannot be represented as a hex spiral." % [terrains_pool.size()]
+	var all_hexes: Array[Hex] = _resolve_hexes_from_definition(definition, terrains_pool.size())
+	if all_hexes.is_empty():
 		return false
-
-	var center := Hex.new(0, 0, 0)
-	var all_hexes: Array[Hex] = HexMath.spiral(center, rings)
 	if all_hexes.size() != terrains_pool.size():
-		last_generation_error = "Hex count mismatch: expected %d, got %d." % [all_hexes.size(), terrains_pool.size()]
+		last_generation_error = "Hex count mismatch: expected %d, got %d." % [terrains_pool.size(), all_hexes.size()]
 		return false
 
 	var numbers_pool: Array = Array(definition.get("numbers", [])).duplicate()
@@ -91,7 +91,7 @@ func generate_from_definition(definition: Dictionary, seed: int = 0) -> bool:
 		last_generation_error = "Expected %d numbers for non-desert tiles, got %d." % [expected_numbers, numbers_pool.size()]
 		return false
 
-	var rng := RNG.new(seed)
+	var rng := RNG.new(_seed)
 	_shuffle_array(terrains_pool, rng)
 
 	var number_index: int = 0
@@ -112,11 +112,72 @@ func generate_from_definition(definition: Dictionary, seed: int = 0) -> bool:
 			robber_hex = hex_key
 			tile.has_robber = true
 
-	if robber_hex.is_empty() and tiles.has(center.to_key()):
-		robber_hex = center.to_key()
-		var center_tile: TileState = tiles[robber_hex] as TileState
-		center_tile.has_robber = true
+	if robber_hex.is_empty():
+		var center_key: String = Hex.new(0, 0, 0).to_key()
+		if tiles.has(center_key):
+			robber_hex = center_key
+			var center_tile: TileState = tiles[robber_hex] as TileState
+			center_tile.has_robber = true
 
+	ports = _build_ports_from_definition(Array(definition.get("docks", [])), rng)
+	return true
+
+func _generate_from_explicit_layout(definition: Dictionary, layout: Array, _seed: int) -> bool:
+	var used: Dictionary = {}
+	var first_desert_key: String = ""
+
+	for raw_tile in layout:
+		var entry: Dictionary = Dictionary(raw_tile)
+		var q: int = int(entry.get("q", 0))
+		var r: int = int(entry.get("r", 0))
+		var s: int = int(entry.get("s", 0))
+		if q + r + s != 0:
+			last_generation_error = "Invalid tile coordinate (q+r+s must be 0): %s" % [str(entry)]
+			return false
+
+		var hex := Hex.new(q, r, s)
+		var hex_key: String = hex.to_key()
+		if used.has(hex_key):
+			last_generation_error = "Duplicated tile coordinate in tiles_layout: %s" % hex_key
+			return false
+		used[hex_key] = true
+
+		var terrain: int = _terrain_from_definition_entry(entry)
+		if terrain < TileState.TERRAIN_FOREST or terrain > TileState.TERRAIN_DESERT:
+			last_generation_error = "Invalid terrain entry in tiles_layout: %s" % [str(entry)]
+			return false
+
+		var token_number: int = int(entry.get("number", entry.get("token_number", 0)))
+		if terrain == TileState.TERRAIN_DESERT:
+			token_number = 0
+			if first_desert_key.is_empty():
+				first_desert_key = hex_key
+
+		var tile := TileState.new(hex_key, terrain, token_number, false)
+		tiles[hex_key] = tile
+		_add_topology_for_hex(hex)
+
+		if bool(entry.get("has_robber", false)):
+			robber_hex = hex_key
+			tile.has_robber = true
+
+	if tiles.is_empty():
+		last_generation_error = "tiles_layout is empty after parsing."
+		return false
+
+	if robber_hex.is_empty():
+		if not first_desert_key.is_empty() and tiles.has(first_desert_key):
+			robber_hex = first_desert_key
+			var desert_tile: TileState = tiles[robber_hex] as TileState
+			desert_tile.has_robber = true
+		else:
+			var center_key: String = Hex.new(0, 0, 0).to_key()
+			if tiles.has(center_key):
+				robber_hex = center_key
+				var center_tile: TileState = tiles[robber_hex] as TileState
+				center_tile.has_robber = true
+
+	var rng := RNG.new(_seed)
 	ports = _build_ports_from_definition(Array(definition.get("docks", [])), rng)
 	return true
 
@@ -231,6 +292,41 @@ func _infer_rings_from_tile_count(tile_count: int) -> int:
 		rings += 1
 
 	return -1
+
+func _resolve_hexes_from_definition(definition: Dictionary, tile_count: int) -> Array[Hex]:
+	var raw_coords: Array = Array(definition.get("cubic_coordinates", []))
+	if not raw_coords.is_empty():
+		var result: Array[Hex] = []
+		var used: Dictionary = {}
+		for raw_coord in raw_coords:
+			var coord: Dictionary = Dictionary(raw_coord)
+			var q: int = int(coord.get("q", 0))
+			var r: int = int(coord.get("r", 0))
+			var s: int = int(coord.get("s", 0))
+			if q + r + s != 0:
+				last_generation_error = "Invalid cubic coordinate (q+r+s must be 0): %s" % [str(coord)]
+				return []
+
+			var hex := Hex.new(q, r, s)
+			var key: String = hex.to_key()
+			if used.has(key):
+				last_generation_error = "Duplicated cubic coordinate: %s" % key
+				return []
+			used[key] = true
+			result.append(hex)
+
+		if result.size() != tile_count:
+			last_generation_error = "cubic_coordinates count (%d) must match tiles count (%d)." % [result.size(), tile_count]
+			return []
+
+		return result
+
+	var rings: int = _infer_rings_from_tile_count(tile_count)
+	if rings < 0:
+		last_generation_error = "Tile count %d is not a full spiral. Provide 'cubic_coordinates' for this map mode (e.g. 30 tiles in 5-6 players)." % [tile_count]
+		return []
+
+	return HexMath.spiral(Hex.new(0, 0, 0), rings)
 
 func _shuffle_array(items: Array, rng: RNG) -> void:
 	for i in range(items.size() - 1, 0, -1):

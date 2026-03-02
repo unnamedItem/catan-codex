@@ -1,8 +1,10 @@
 [gd_scene load_steps=3 format=3 uid="uid://hn0w22vf4nry"]
 
 [ext_resource type="Script" uid="uid://dnmplg4bs8cto" path="res://scenes/game/board/map.gd" id="1_m1b8m"]
-[ext_resource type="JSON" path="res://game/data/maps/standard_map.json" id="2_wsscp"]
+[ext_resource type="JSON" path="res://game/data/maps/standard_map_ext.json" id="2_wsscp"]
 
 [node name="Map" type="Node2D"]
+position = Vector2(612, 309)
 script = ExtResource("1_m1b8m")
 map_data = ExtResource("2_wsscp")
+map_seed = 12
